@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: service-pulse-dashboard
+    runtime: static
+    buildCommand: npm ci && npm run build:pages
+    staticPublishPath: ./dist-pages
+    autoDeployTrigger: commit
