@@ -18,6 +18,7 @@ import { analyzeIssues } from "../lib/issues.ts";
 import {
   AVOIDED_MANUAL_MINUTES,
   calculateChatbotMetrics,
+  projectAutomationScenario,
   rankAutomationOpportunities,
 } from "../lib/automation.ts";
 import {
@@ -230,6 +231,22 @@ test("automation opportunities rank manual workload with visible estimates", () 
     ),
   );
   assert.ok(opportunities[0].score >= opportunities.at(-1).score);
+});
+
+test("automation scenario projects incremental containment without overstating volume", () => {
+  const metrics = calculateChatbotMetrics(tickets);
+  const scenario = projectAutomationScenario(metrics, 80, 15);
+  assert.ok(scenario.projectedContainedConversations <= metrics.conversations);
+  assert.equal(
+    scenario.additionalContainedConversations,
+    scenario.projectedContainedConversations - metrics.resolved,
+  );
+  assert.equal(
+    scenario.additionalHoursSaved,
+    (scenario.additionalContainedConversations * 15) / 60,
+  );
+  const lowerTarget = projectAutomationScenario(metrics, 0, 15);
+  assert.equal(lowerTarget.additionalContainedConversations, 0);
 });
 
 test("stuck-ticket detection uses the defined inactivity threshold", () => {
