@@ -209,7 +209,70 @@ export function toExportRows(records: TicketRecord[]) {
     routingMode: record.routingMode,
     knowledgeBaseUsed: record.knowledgeBaseUsed,
     workflowBypassed: record.workflowBypassed,
+    categoryAccurate: record.categoryAccurate,
+    workflowCompliant: record.workflowCompliant,
+    escalated: record.escalated,
+    workflowStage: record.workflowStage,
+    lastActivityAt: record.lastActivityAt,
+    slaMet:
+      record.firstResponseMinutes === null
+        ? ""
+        : record.firstResponseMinutes <= record.slaTargetMinutes,
   }));
+}
+
+export const metricDefinitions = [
+  { metric: "Ticket volume", definition: "Count of tickets in the selected reporting context.", calculation: "COUNT(Ticket ID)", preferredDirection: "Context only" },
+  { metric: "CSAT", definition: "Share of valid survey responses scoring 4 or 5 out of 5.", calculation: "Positive CSAT responses / valid CSAT responses", preferredDirection: "Higher" },
+  { metric: "First response", definition: "Average minutes from ticket creation to the first human or automated response.", calculation: "AVERAGE(First response minutes)", preferredDirection: "Lower" },
+  { metric: "Handling time", definition: "Average active handling minutes recorded for eligible tickets.", calculation: "AVERAGE(Handling minutes)", preferredDirection: "Lower" },
+  { metric: "Resolution rate", definition: "Share of tickets with Resolved status.", calculation: "Resolved tickets / all tickets", preferredDirection: "Higher" },
+  { metric: "First-contact resolution", definition: "Share of resolved tickets without reopening or repeat contact.", calculation: "Resolved without reopen or repeat / resolved tickets", preferredDirection: "Higher" },
+  { metric: "SLA compliance", definition: "Share of eligible tickets whose first response is within the ticket SLA target.", calculation: "Responses within SLA / SLA-eligible tickets", preferredDirection: "Higher" },
+  { metric: "Backlog", definition: "Count of tickets not yet resolved.", calculation: "Open + Pending tickets", preferredDirection: "Lower" },
+] as const;
+
+export const reportDataDictionary = [
+  ...importFields.map((field) => ({
+    field: field.key,
+    label: field.label,
+    requiredForImport: field.required ? "Yes" : "No",
+    description: ({
+      id: "Unique ticket identifier.", createdAt: "Ticket creation date in YYYY-MM-DD format.", team: "Business team accountable for the ticket.", agent: "Assigned agent or owner.", channel: "Customer contact channel.", category: "Standardized issue category.", segment: "Customer segment used for comparison.", status: "Current ticket status.", firstResponseMinutes: "Minutes to first response.", handlingMinutes: "Active handling minutes.", csatScore: "Customer satisfaction survey score from 1 to 5.", slaTargetMinutes: "First-response SLA threshold in minutes.", reopened: "Whether the ticket reopened after resolution.", repeatContact: "Whether the customer contacted support again for the same issue.", chatbotOutcome: "Resolved, Fallback, or Handoff outcome for chatbot conversations.", requiredFieldsComplete: "Whether required intake fields were captured.", crmProfileLinked: "Whether the customer CRM profile is linked.", routingMode: "Automated or Manual assignment method.", knowledgeBaseUsed: "Whether approved knowledge content supported the interaction.", workflowBypassed: "Whether the expected service workflow was skipped.",
+    } as Record<string, string>)[field.key],
+  })),
+  { field: "categoryAccurate", label: "Category accurate", requiredForImport: "Derived/demo", description: "Quality-review result for ticket categorization." },
+  { field: "workflowCompliant", label: "Workflow compliant", requiredForImport: "Derived/demo", description: "Whether the expected handling workflow was followed." },
+  { field: "escalated", label: "Escalated", requiredForImport: "Derived/demo", description: "Whether the ticket required escalation." },
+  { field: "workflowStage", label: "Workflow stage", requiredForImport: "Derived", description: "Current operating stage used by Process Health." },
+  { field: "lastActivityAt", label: "Last activity date", requiredForImport: "Derived/demo", description: "Most recent ticket activity date." },
+  { field: "slaMet", label: "SLA met", requiredForImport: "Derived", description: "Whether first response was within the SLA target." },
+] as const;
+
+export function buildPivotSummary(records: TicketRecord[]) {
+  const dimensions = [
+    { dimension: "Team", values: [...new Set(records.map((record) => record.team))], select: (record: TicketRecord) => record.team },
+    { dimension: "Channel", values: [...new Set(records.map((record) => record.channel))], select: (record: TicketRecord) => record.channel },
+    { dimension: "Issue category", values: [...new Set(records.map((record) => record.category))], select: (record: TicketRecord) => record.category },
+  ];
+  return dimensions.flatMap(({ dimension, values, select }) =>
+    values.sort().map((value) => {
+      const group = records.filter((record) => select(record) === value);
+      const kpis = calculateKpis(group);
+      return {
+        dimension,
+        value,
+        tickets: kpis.ticketCount,
+        csatPercent: kpis.csatPercent,
+        firstResponseMinutes: kpis.averageFirstResponseMinutes,
+        handlingMinutes: kpis.averageHandlingMinutes,
+        resolutionRate: kpis.resolutionRate,
+        firstContactResolutionRate: kpis.firstContactResolutionRate,
+        slaComplianceRate: kpis.slaComplianceRate,
+        backlog: kpis.backlog,
+      };
+    }),
+  );
 }
 
 export function buildReportPeriods(
