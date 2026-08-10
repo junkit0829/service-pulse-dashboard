@@ -28,7 +28,10 @@ import {
 import { buildPriorityActions } from "../lib/priority-actions.ts";
 import {
   autoMapColumns,
+  buildPivotSummary,
   buildReportPeriods,
+  metricDefinitions,
+  reportDataDictionary,
   toExportRows,
   validateAndNormalizeRows,
 } from "../lib/reporting.ts";
@@ -324,4 +327,20 @@ test("weekly and monthly reporting groups use calendar periods", () => {
     monthly.map((period) => period.period),
     ["2026-06", "2026-07"],
   );
+});
+
+test("management report support reconciles pivot totals and documents exported fields", () => {
+  const pivot = buildPivotSummary(tickets);
+  for (const dimension of ["Team", "Channel", "Issue category"]) {
+    assert.equal(
+      pivot.filter((row) => row.dimension === dimension).reduce((total, row) => total + row.tickets, 0),
+      tickets.length,
+    );
+  }
+  assert.ok(metricDefinitions.some((item) => item.metric === "CSAT"));
+  assert.ok(reportDataDictionary.some((item) => item.field === "crmProfileLinked"));
+  assert.ok(reportDataDictionary.some((item) => item.field === "slaMet"));
+  const [exported] = toExportRows(tickets.slice(0, 1));
+  assert.ok("workflowStage" in exported);
+  assert.ok("slaMet" in exported);
 });
