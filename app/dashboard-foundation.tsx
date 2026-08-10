@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   filterTickets,
   tickets,
@@ -60,16 +60,16 @@ type PageKey =
   | "process"
   | "reports";
 
-const navigation: { key: PageKey; label: string; phase: number; glyph: string }[] =
+const navigation: { key: PageKey; label: string; section: string; glyph: string }[] =
   [
-    { key: "priority", label: "Priority actions", phase: 0, glyph: "!" },
-    { key: "foundation", label: "Data foundation", phase: 1, glyph: "D" },
-    { key: "overview", label: "KPI overview", phase: 2, glyph: "K" },
-    { key: "analysis", label: "Performance", phase: 3, glyph: "P" },
-    { key: "issues", label: "Customer issues", phase: 4, glyph: "C" },
-    { key: "automation", label: "AI & automation", phase: 5, glyph: "A" },
-    { key: "process", label: "Process health", phase: 6, glyph: "S" },
-    { key: "reports", label: "Reports", phase: 7, glyph: "R" },
+    { key: "priority", label: "Priority actions", section: "Act", glyph: "!" },
+    { key: "foundation", label: "Data foundation", section: "Monitor", glyph: "D" },
+    { key: "overview", label: "KPI overview", section: "Monitor", glyph: "K" },
+    { key: "analysis", label: "Performance", section: "Monitor", glyph: "P" },
+    { key: "issues", label: "Customer issues", section: "Monitor", glyph: "C" },
+    { key: "automation", label: "AI & automation", section: "Improve", glyph: "A" },
+    { key: "process", label: "Process health", section: "Improve", glyph: "S" },
+    { key: "reports", label: "Reports", section: "Share", glyph: "R" },
   ];
 
 type DateKey = "all" | "july" | "recent" | "custom";
@@ -118,6 +118,14 @@ export function DashboardFoundation() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [sourceName, setSourceName] = useState("Synthetic demonstration data");
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  useEffect(() => {
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMobileNavOpen(false);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, []);
   const [drilldown, setDrilldown] = useState<{ title: string; records: TicketRecord[] } | null>(null);
 
   useEffect(() => {
@@ -260,23 +268,34 @@ export function DashboardFoundation() {
         </div>
 
         <nav aria-label="Primary navigation">
-          <p className="nav-label">Workspace</p>
-          {navigation.map((item) => (
-            <button
-              className={`nav-item ${page === item.key ? "active" : ""}`}
-              key={item.key}
-              onClick={() => {
-                setPage(item.key);
-                setMobileNavOpen(false);
-              }}
-              aria-current={page === item.key ? "page" : undefined}
-            >
-              <span className="nav-glyph" aria-hidden="true">{item.glyph}</span>
-              <span>{item.label}</span>
-            </button>
+          {navigation.map((item, index) => (
+            <Fragment key={item.key}>
+              {(index === 0 || navigation[index - 1].section !== item.section) && (
+                <p className="nav-label">{item.section}</p>
+              )}
+              <button
+                className={`nav-item ${page === item.key ? "active" : ""}`}
+                onClick={() => {
+                  setPage(item.key);
+                  setMobileNavOpen(false);
+                }}
+                aria-current={page === item.key ? "page" : undefined}
+                title={item.label}
+              >
+                <span className="nav-glyph" aria-hidden="true">{item.glyph}</span>
+                <span>{item.label}</span>
+              </button>
+            </Fragment>
           ))}
         </nav>
       </aside>
+      {mobileNavOpen && (
+        <button
+          className="sidebar-backdrop"
+          aria-label="Close navigation"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
 
       <section className="workspace">
         <header className="topbar">
@@ -344,7 +363,17 @@ export function DashboardFoundation() {
             </div>
           </section>
 
-          {page === "priority" ? (
+          {!filtered.length ? (
+            <section className="empty-state global-empty-state">
+              <span aria-hidden="true">0</span>
+              <h2>No records match these filters</h2>
+              <p>Broaden the reporting period or clear a team, channel, or issue-category filter to continue.</p>
+              <div>
+                <button onClick={resetFilters}>Reset all filters</button>
+                <button className="quiet" onClick={() => setPage("reports")}>Open data import</button>
+              </div>
+            </section>
+          ) : page === "priority" ? (
             <PriorityActionsPage
               records={filtered}
               periodLabel={selectedRange.label}
@@ -394,9 +423,7 @@ export function DashboardFoundation() {
               sourceName={sourceName}
               lastUpdated={lastUpdated}
             />
-          ) : (
-            <UpcomingPage item={current} />
-          )}
+          ) : null}
         </div>
       </section>
       {drilldown && <TicketDrilldown {...drilldown} onClose={() => setDrilldown(null)} />}
@@ -596,15 +623,15 @@ function FoundationContent({
   filteredCount: number;
   kpis: ReturnType<typeof calculateKpis>;
 }) {
-  const metrics = [
-    ["Ticket records", formatMetric(kpis.ticketCount, "number"), "Count of valid records"],
-    ["CSAT", formatMetric(kpis.csatPercent, "percent"), "Scores of 4–5 are positive"],
-    ["First response", formatMetric(kpis.averageFirstResponseMinutes, "minutes"), "Mean of valid response times"],
-    ["Handling time", formatMetric(kpis.averageHandlingMinutes, "minutes"), "Mean of valid handling times"],
-    ["Resolution rate", formatMetric(kpis.resolutionRate, "percent"), "Resolved ÷ eligible tickets"],
-    ["SLA compliance", formatMetric(kpis.slaComplianceRate, "percent"), "Responses within channel target"],
-    ["Backlog", formatMetric(kpis.backlog, "number"), "Open + pending tickets"],
-    ["First-contact resolution", formatMetric(kpis.firstContactResolutionRate, "percent"), "No reopen or repeat contact"],
+  const metrics: Array<[keyof KpiSummary, string, string, string]> = [
+    ["ticketCount", "Ticket records", formatMetric(kpis.ticketCount, "number"), "Count of valid records"],
+    ["csatPercent", "CSAT", formatMetric(kpis.csatPercent, "percent"), "Scores of 4–5 are positive"],
+    ["averageFirstResponseMinutes", "First response", formatMetric(kpis.averageFirstResponseMinutes, "minutes"), "Mean of valid response times"],
+    ["averageHandlingMinutes", "Handling time", formatMetric(kpis.averageHandlingMinutes, "minutes"), "Mean of valid handling times"],
+    ["resolutionRate", "Resolution rate", formatMetric(kpis.resolutionRate, "percent"), "Resolved ÷ eligible tickets"],
+    ["slaComplianceRate", "SLA compliance", formatMetric(kpis.slaComplianceRate, "percent"), "Responses within channel target"],
+    ["backlog", "Backlog", formatMetric(kpis.backlog, "number"), "Open + pending tickets"],
+    ["firstContactResolutionRate", "First-contact resolution", formatMetric(kpis.firstContactResolutionRate, "percent"), "No reopen or repeat contact"],
   ];
 
   return (
@@ -619,12 +646,11 @@ function FoundationContent({
         <>
           <section className="hero-panel">
             <div>
-              <p className="eyebrow">Phase 1 · Calculation preview</p>
+              <p className="eyebrow">Calculation foundation</p>
               <h2>One reliable source for every decision.</h2>
               <p>
                 The filter context below feeds the same validated records into
-                every metric. Charts arrive in Phase 2, after this calculation
-                layer passes its quality gate.
+                every metric, comparison, chart, recommendation, and report.
               </p>
             </div>
             <div className="quality-score">
@@ -640,12 +666,12 @@ function FoundationContent({
                 <p className="eyebrow">Live calculation check</p>
                 <h2 id="metric-preview-title">Verified metric outputs</h2>
               </div>
-              <span className="phase-chip">Foundation preview</span>
+              <span className="phase-chip">Live calculations</span>
             </div>
             <div className="metric-grid">
-              {metrics.map(([label, value, note]) => (
+              {metrics.map(([key, label, value, note]) => (
                 <article className="metric-card" key={label}>
-                  <span>{label}</span>
+                  <span>{label} <MetricInfo text={metricTooltip(key)} /></span>
                   <strong>{value}</strong>
                   <small>{note}</small>
                 </article>
@@ -723,18 +749,20 @@ const overviewMetrics: MetricCardConfig[] = [
   { key: "slaComplianceRate", label: "SLA compliance", type: "percent", target: 90, targetLabel: "≥ 90%", direction: "higher" },
 ];
 
-function metricDefinition(metric: keyof KpiSummary) {
-  const definitions: Record<keyof KpiSummary, string> = {
-    ticketCount: "All valid tickets inside the active filters.",
-    csatPercent: "The share of received CSAT scores rated 4 or 5.",
-    averageFirstResponseMinutes: "Mean minutes until the first agent or automated response.",
-    averageHandlingMinutes: "Mean active handling time for tickets with a recorded value.",
-    resolutionRate: "Resolved tickets divided by all selected tickets.",
-    backlog: "Tickets currently marked Open or Pending.",
-    slaComplianceRate: "Responses completed within each ticket’s channel SLA target.",
-    firstContactResolutionRate: "Resolved without reopening or repeat contact.",
-  };
-  return definitions[metric];
+const kpiGuidance: Record<keyof KpiSummary, { calculation: string; target: string; interpretation: string }> = {
+  ticketCount: { calculation: "Count of all valid tickets inside the active filters.", target: "Compare with available team capacity.", interpretation: "Volume gives context; it is not good or bad by itself." },
+  csatPercent: { calculation: "CSAT scores of 4 or 5 ÷ all valid CSAT responses.", target: "At least 85%.", interpretation: "Higher is better; read it with response and resolution performance." },
+  averageFirstResponseMinutes: { calculation: "Total valid first-response minutes ÷ tickets with a response value.", target: "20 minutes or less.", interpretation: "Lower is better; rising time can indicate queue or routing pressure." },
+  averageHandlingMinutes: { calculation: "Total valid handling minutes ÷ tickets with handling data.", target: "25 minutes or less.", interpretation: "Lower can mean efficiency, but should not reduce CSAT or resolution quality." },
+  resolutionRate: { calculation: "Resolved tickets ÷ all selected tickets.", target: "At least 85%.", interpretation: "Higher is better; inspect backlog when the rate declines." },
+  backlog: { calculation: "Count of tickets currently marked Open or Pending.", target: "3 tickets or fewer in this demo.", interpretation: "Lower is better; review aging and ownership as well as the count." },
+  slaComplianceRate: { calculation: "Responses within each ticket SLA ÷ SLA-eligible tickets.", target: "At least 90%.", interpretation: "Higher is better; compare teams and channels to locate breaches." },
+  firstContactResolutionRate: { calculation: "Resolved tickets without reopening or repeat contact ÷ resolved tickets.", target: "At least 80%.", interpretation: "Higher is better and suggests the first resolution was effective." },
+};
+
+function metricTooltip(metric: keyof KpiSummary, target?: string) {
+  const guidance = kpiGuidance[metric];
+  return `Calculation: ${guidance.calculation} Target: ${target ?? guidance.target} How to read it: ${guidance.interpretation}`;
 }
 
 function MetricInfo({ text }: { text: string }) {
@@ -817,7 +845,7 @@ function OverviewContent({
               aria-label={`Open ${metric.label} ticket details`}
             >
               <div className="executive-card-top">
-                <span>{metric.label} <MetricInfo text={metricDefinition(metric.key)} /></span>
+                <span>{metric.label} <MetricInfo text={metricTooltip(metric.key, metric.targetLabel)} /></span>
                 <b className={targetMet ? "target-good" : "target-risk"}>
                   {targetMet ? "On target" : "Needs attention"}
                 </b>
@@ -857,6 +885,16 @@ function OverviewContent({
             </button>
           );
         })}
+      </section>
+
+      <section className="kpi-reading-guide" aria-label="KPI interpretation guidance">
+        <div>
+          <p className="eyebrow">How to read the scorecards</p>
+          <strong>Use movement, target, and customer outcome together.</strong>
+        </div>
+        <p><b>Target</b><span>Shows whether the current value meets the operating benchmark.</span></p>
+        <p><b>Movement</b><span>Compares the same metric with the equivalent previous period.</span></p>
+        <p><b>Quality check</b><span>Efficiency gains should not worsen CSAT, repeat contact, or escalation.</span></p>
       </section>
 
       <section className="overview-grid">
@@ -2644,9 +2682,9 @@ function ReportsAndExcel({
     const summaryRows: (string | number | null)[][] = [
       ["Ticket volume", reportKpis.ticketCount, null, "Context", "Count of tickets in the selected reporting context."],
       ["CSAT", percent(reportKpis.csatPercent), .85, (reportKpis.csatPercent ?? 0) >= 85 ? "On target" : "Below target", "Share of valid responses scoring 4 or 5."],
-      ["First response", reportKpis.averageFirstResponseMinutes, 15, (reportKpis.averageFirstResponseMinutes ?? Infinity) <= 15 ? "On target" : "Above target", "Average minutes to first response."],
-      ["Handling time", reportKpis.averageHandlingMinutes, 30, (reportKpis.averageHandlingMinutes ?? Infinity) <= 30 ? "On target" : "Above target", "Average active handling minutes."],
-      ["Resolution rate", percent(reportKpis.resolutionRate), .9, (reportKpis.resolutionRate ?? 0) >= 90 ? "On target" : "Below target", "Resolved tickets divided by all tickets."],
+      ["First response", reportKpis.averageFirstResponseMinutes, 20, (reportKpis.averageFirstResponseMinutes ?? Infinity) <= 20 ? "On target" : "Above target", "Average minutes to first response."],
+      ["Handling time", reportKpis.averageHandlingMinutes, 25, (reportKpis.averageHandlingMinutes ?? Infinity) <= 25 ? "On target" : "Above target", "Average active handling minutes."],
+      ["Resolution rate", percent(reportKpis.resolutionRate), .85, (reportKpis.resolutionRate ?? 0) >= 85 ? "On target" : "Below target", "Resolved tickets divided by all tickets."],
       ["First-contact resolution", percent(reportKpis.firstContactResolutionRate), .8, (reportKpis.firstContactResolutionRate ?? 0) >= 80 ? "On target" : "Below target", "Resolved without reopen or repeat contact."],
       ["SLA compliance", percent(reportKpis.slaComplianceRate), .9, (reportKpis.slaComplianceRate ?? 0) >= 90 ? "On target" : "Below target", "Eligible first responses completed within SLA."],
       ["Backlog", reportKpis.backlog, null, "Monitor", "Tickets not yet resolved."],
@@ -2976,28 +3014,5 @@ function TicketDrilldown({
         )}
       </aside>
     </div>
-  );
-}
-
-function UpcomingPage({
-  item,
-}: {
-  item: (typeof navigation)[number];
-}) {
-  return (
-    <section className="upcoming-page">
-      <span className="upcoming-number">0{item.phase}</span>
-      <p className="eyebrow">Planned phase {item.phase}</p>
-      <h2>{item.label}</h2>
-      <p>
-        The navigation destination is connected and inherits the shared filter
-        context. Its analytical components will be added only after the prior
-        phase passes review.
-      </p>
-      <div className="upcoming-context">
-        <span className="status-dot" />
-        Waiting for the Phase {item.phase - 1} quality gate
-      </div>
-    </section>
   );
 }
