@@ -125,8 +125,24 @@ test("priority actions rank traceable cross-functional recommendations", () => {
   assert.equal(actions.length, 3);
   assert.ok(actions.every((action) => action.records.length > 0));
   assert.ok(actions.every((action) => action.owner && action.recommendation));
+  assert.ok(actions.every((action) => action.recommendationType === "Rule-based"));
+  assert.ok(actions.every((action) => action.recommendationBasis.length >= 2));
   assert.ok(actions.every((action, index) => index === 0 || actions[index - 1].score >= action.score));
   assert.ok(actions.some((action) => action.sourcePage === "issues"));
+});
+
+test("payment recommendations change when escalation and repeat contact are elevated", () => {
+  const paymentRisk = tickets.filter(
+    (record) =>
+      record.createdAt >= "2026-07-01" &&
+      record.category === "Payment Failed",
+  );
+  const action = buildPriorityActions(paymentRisk).find((item) => item.sourcePage === "issues");
+
+  assert.ok(action);
+  assert.match(action.recommendation, /one owner to payment exceptions/i);
+  assert.ok(action.recommendationBasis.some((reason) => reason.includes("escalated")));
+  assert.ok(action.recommendationBasis.some((reason) => reason.includes("repeat contact")));
 });
 
 test("metric direction correctly interprets positive and negative change", () => {
