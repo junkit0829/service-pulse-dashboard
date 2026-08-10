@@ -35,6 +35,9 @@ import {
   recommendProcessActions,
 } from "../lib/process-health";
 import {
+  buildPriorityActions,
+} from "../lib/priority-actions";
+import {
   autoMapColumns,
   buildReportPeriods,
   importFields,
@@ -44,6 +47,7 @@ import {
 } from "../lib/reporting";
 
 type PageKey =
+  | "priority"
   | "foundation"
   | "overview"
   | "analysis"
@@ -54,6 +58,7 @@ type PageKey =
 
 const navigation: { key: PageKey; label: string; phase: number; glyph: string }[] =
   [
+    { key: "priority", label: "Priority actions", phase: 0, glyph: "!" },
     { key: "foundation", label: "Data foundation", phase: 1, glyph: "D" },
     { key: "overview", label: "KPI overview", phase: 2, glyph: "K" },
     { key: "analysis", label: "Performance", phase: 3, glyph: "P" },
@@ -98,7 +103,7 @@ const rangeLength = (start: string, end: string) =>
   );
 
 export function DashboardFoundation() {
-  const [page, setPage] = useState<PageKey>("reports");
+  const [page, setPage] = useState<PageKey>("priority");
   const [activeTickets, setActiveTickets] = useState<TicketRecord[]>(tickets);
   const [date, setDate] = useState<DateKey>("july");
   const [customStart, setCustomStart] = useState("2026-07-01");
@@ -335,7 +340,14 @@ export function DashboardFoundation() {
             </div>
           </section>
 
-          {page === "foundation" ? (
+          {page === "priority" ? (
+            <PriorityActionsPage
+              records={filtered}
+              periodLabel={selectedRange.label}
+              onOpenRecords={(title, records) => setDrilldown({ title, records })}
+              onNavigate={setPage}
+            />
+          ) : page === "foundation" ? (
             <FoundationContent filteredCount={filtered.length} kpis={kpis} />
           ) : page === "overview" ? (
             <OverviewContent
@@ -385,6 +397,162 @@ export function DashboardFoundation() {
       </section>
       {drilldown && <TicketDrilldown {...drilldown} onClose={() => setDrilldown(null)} />}
     </main>
+  );
+}
+
+type ActionStatus = "Proposed" | "In progress" | "Completed";
+
+function PriorityActionsPage({
+  records,
+  periodLabel,
+  onOpenRecords,
+  onNavigate,
+}: {
+  records: TicketRecord[];
+  periodLabel: string;
+  onOpenRecords: (title: string, records: TicketRecord[]) => void;
+  onNavigate: (page: PageKey) => void;
+}) {
+  const actions = useMemo(() => buildPriorityActions(records), [records]);
+  const [statuses, setStatuses] = useState<Record<string, ActionStatus>>({});
+  const affectedTickets = new Set(actions.flatMap((action) => action.records.map((record) => record.id))).size;
+  const criticalActions = actions.filter((action) => action.urgency === "Critical").length;
+  const owners = new Set(actions.map((action) => action.owner)).size;
+
+  if (!records.length) {
+    return (
+      <section className="empty-state priority-empty">
+        <span>✓</span>
+        <h2>No priority actions for this selection</h2>
+        <p>Expand the period or remove a filter to generate a ranked action summary.</p>
+      </section>
+    );
+  }
+
+  return (
+    <>
+      <section className="priority-hero">
+        <div>
+          <p className="eyebrow">Decision brief · {periodLabel}</p>
+          <h2>Turn the strongest signals into accountable action.</h2>
+          <p>
+            Service Pulse combines customer impact, operating gaps, and affected
+            volume to rank the next actions for CX, Operations, Payment, Product,
+            and Technology teams.
+          </p>
+        </div>
+        <div className="priority-hero-score" aria-label={`${actions.length} ranked actions`}>
+          <span>Actions ranked</span>
+          <strong>{actions.length}</strong>
+          <small>Recalculates with every filter</small>
+        </div>
+      </section>
+
+      <section className="priority-summary-grid" aria-label="Priority action summary">
+        <article>
+          <span className="priority-summary-icon risk">!</span>
+          <div><small>Critical actions</small><strong>{criticalActions}</strong><p>Immediate management attention</p></div>
+        </article>
+        <article>
+          <span className="priority-summary-icon tickets">#</span>
+          <div><small>Tickets exposed</small><strong>{affectedTickets}</strong><p>Unique records behind the actions</p></div>
+        </article>
+        <article>
+          <span className="priority-summary-icon owners">◎</span>
+          <div><small>Teams accountable</small><strong>{owners}</strong><p>Named cross-functional owners</p></div>
+        </article>
+        <article>
+          <span className="priority-summary-icon refresh">↻</span>
+          <div><small>Review cadence</small><strong>Weekly</strong><p>Recheck movement after action</p></div>
+        </article>
+      </section>
+
+      <section className="priority-actions-section">
+        <div className="section-title priority-section-title">
+          <div>
+            <p className="eyebrow">Ranked action register</p>
+            <h2>What needs attention first</h2>
+          </div>
+          <p>Priority score combines scale and business impact. Higher is more urgent.</p>
+        </div>
+
+        <div className="priority-action-list">
+          {actions.map((action, index) => {
+            const status = statuses[action.id] ?? "Proposed";
+            return (
+              <article className={`priority-action-card ${action.urgency.toLowerCase()}`} key={action.id}>
+                <div className="priority-rank" aria-label={`Rank ${index + 1}`}>
+                  <span>0{index + 1}</span>
+                  <div className="priority-score-ring" style={{ "--score": `${action.score}%` } as React.CSSProperties}>
+                    <strong>{Math.round(action.score)}</strong>
+                    <small>score</small>
+                  </div>
+                </div>
+
+                <div className="priority-action-body">
+                  <div className="priority-action-heading">
+                    <div>
+                      <div className="priority-action-tags">
+                        <span className={`priority-pill ${action.urgency.toLowerCase()}`}>{action.urgency}</span>
+                        <span>{action.area}</span>
+                      </div>
+                      <h3>{action.title}</h3>
+                    </div>
+                    <label className="action-status-control">
+                      <span>Status</span>
+                      <select
+                        value={status}
+                        onChange={(event) =>
+                          setStatuses((current) => ({
+                            ...current,
+                            [action.id]: event.target.value as ActionStatus,
+                          }))
+                        }
+                        aria-label={`Status for ${action.title}`}
+                      >
+                        <option>Proposed</option>
+                        <option>In progress</option>
+                        <option>Completed</option>
+                      </select>
+                    </label>
+                  </div>
+
+                  <p className="priority-evidence">{action.evidence}</p>
+
+                  <div className="priority-action-detail-grid">
+                    <div><span>Recommended action</span><strong>{action.recommendation}</strong></div>
+                    <div><span>Accountable owner</span><strong>{action.owner}</strong></div>
+                    <div><span>Expected reach</span><strong>{action.expectedImpact}</strong></div>
+                    <div><span>Success measure</span><strong>{action.targetOutcome}</strong></div>
+                  </div>
+
+                  <div className="priority-action-footer">
+                    <button
+                      className="primary-action-button"
+                      onClick={() => onOpenRecords(`${action.title} · supporting tickets`, action.records)}
+                    >
+                      Review {action.records.length} supporting tickets
+                    </button>
+                    <button className="secondary-action-button" onClick={() => onNavigate(action.sourcePage)}>
+                      Open detailed analysis →
+                    </button>
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="priority-method-note">
+        <div className="priority-method-mark">i</div>
+        <div>
+          <p className="eyebrow">Transparent prioritization</p>
+          <h2>Every action remains traceable to the selected records.</h2>
+          <p>Scores are recalculated when the period, team, channel, or issue category changes. Use the supporting-ticket view to validate the evidence before assigning work.</p>
+        </div>
+      </section>
+    </>
   );
 }
 
