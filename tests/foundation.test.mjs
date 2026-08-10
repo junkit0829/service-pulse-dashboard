@@ -24,6 +24,7 @@ import {
   analyzeProcessHealth,
   recommendProcessActions,
 } from "../lib/process-health.ts";
+import { buildPriorityActions } from "../lib/priority-actions.ts";
 import {
   autoMapColumns,
   buildReportPeriods,
@@ -115,6 +116,17 @@ test("synthetic records cover every job-description data domain", () => {
   assert.ok(tickets.some((record) => record.chatbotOutcome === "Resolved"));
   assert.ok(tickets.some((record) => record.chatbotOutcome === "Fallback"));
   assert.ok(tickets.some((record) => record.chatbotOutcome === "Handoff"));
+});
+
+test("priority actions rank traceable cross-functional recommendations", () => {
+  const july = tickets.filter((record) => record.createdAt >= "2026-07-01");
+  const actions = buildPriorityActions(july);
+
+  assert.equal(actions.length, 3);
+  assert.ok(actions.every((action) => action.records.length > 0));
+  assert.ok(actions.every((action) => action.owner && action.recommendation));
+  assert.ok(actions.every((action, index) => index === 0 || actions[index - 1].score >= action.score));
+  assert.ok(actions.some((action) => action.sourcePage === "issues"));
 });
 
 test("metric direction correctly interprets positive and negative change", () => {
