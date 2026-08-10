@@ -2413,6 +2413,158 @@ select:focus-visible {
   font-weight: 800;
 }
 
+.automation-scenario-panel {
+  padding: 24px;
+  margin-top: 14px;
+  border: 1px solid #d7e6e3;
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 92% 5%, rgba(105, 207, 193, .14), transparent 28%),
+    #fff;
+  box-shadow: 0 8px 24px rgba(39, 71, 76, .05);
+}
+
+.scenario-heading,
+.scenario-heading > div:first-child,
+.scenario-current span,
+.scenario-current strong,
+.scenario-current small {
+  display: block;
+}
+
+.scenario-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.scenario-heading h2 {
+  margin: 6px 0;
+  font-family: Georgia, serif;
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.scenario-heading p:last-child {
+  max-width: 690px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.scenario-current {
+  min-width: 210px;
+  padding: 14px 16px;
+  border: 1px solid #d7e7e4;
+  border-radius: 13px;
+  background: rgba(242, 249, 247, .88);
+}
+
+.scenario-current span,
+.scenario-results span,
+.quality-guardrails span {
+  color: #738286;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.scenario-current strong {
+  margin: 4px 0;
+  color: #176f65;
+  font-family: Georgia, serif;
+  font-size: 25px;
+}
+
+.scenario-current small,
+.scenario-results small,
+.quality-guardrails small {
+  color: #879397;
+  font-size: 11px;
+}
+
+.scenario-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, .9fr) minmax(0, 1.35fr);
+  gap: 22px;
+  margin-top: 22px;
+}
+
+.scenario-controls {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  border-radius: 14px;
+  background: #f5f8f7;
+}
+
+.scenario-controls label > span {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  color: #43565c;
+  font-size: 12px;
+}
+
+.scenario-controls label > span strong { color: var(--teal); }
+
+.scenario-controls input[type="range"] {
+  width: 100%;
+  margin: 12px 0 7px;
+  accent-color: var(--teal);
+  cursor: pointer;
+}
+
+.scenario-controls small { color: #849095; font-size: 11px; line-height: 1.45; }
+
+.scenario-results {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scenario-results article {
+  display: flex;
+  min-height: 126px;
+  padding: 16px;
+  flex-direction: column;
+  justify-content: center;
+  border: 1px solid #e0e9e7;
+  border-radius: 14px;
+}
+
+.scenario-results strong {
+  margin: 7px 0 5px;
+  color: #263b42;
+  font-family: Georgia, serif;
+  font-size: 30px;
+  font-weight: 500;
+}
+
+.quality-guardrails {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(240px, 1.35fr);
+  gap: 1px;
+  margin-top: 16px;
+  overflow: hidden;
+  border: 1px solid #e1e9e7;
+  border-radius: 13px;
+  background: #e1e9e7;
+}
+
+.quality-guardrails > div,
+.quality-guardrails > p {
+  margin: 0;
+  padding: 14px 16px;
+  background: #fff;
+}
+
+.quality-guardrails strong { display: block; margin: 5px 0; color: #30454c; font-size: 18px; }
+.quality-guardrails p { color: #64747a; font-size: 11px; line-height: 1.55; }
+.quality-guardrails p b { color: #2e625c; }
+
 .ai-recommendation {
   display: grid;
   grid-template-columns: 54px minmax(0, 1.3fr) minmax(260px, .75fr);
@@ -4223,6 +4375,9 @@ select:focus-visible {
   .ai-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+  .scenario-layout { grid-template-columns: 1fr; }
+  .quality-guardrails { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .quality-guardrails > p { grid-column: 1 / -1; }
   .process-metric-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
@@ -4427,6 +4582,12 @@ select:focus-visible {
   .ai-recommendation {
     grid-template-columns: 48px 1fr;
   }
+  .scenario-heading { flex-direction: column; }
+  .scenario-current { width: 100%; }
+  .scenario-results { grid-template-columns: 1fr; }
+  .scenario-results article { min-height: 100px; }
+  .quality-guardrails { grid-template-columns: 1fr; }
+  .quality-guardrails > p { grid-column: auto; }
   .assumption-card {
     grid-column: 1 / -1;
     padding: 14px 0 0;

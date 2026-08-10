@@ -28,6 +28,7 @@ import { analyzeIssues, type IssueAnalysis } from "../lib/issues";
 import {
   AVOIDED_MANUAL_MINUTES,
   calculateChatbotMetrics,
+  projectAutomationScenario,
   rankAutomationOpportunities,
 } from "../lib/automation";
 import {
@@ -1765,6 +1766,8 @@ function AIAndAutomation({
   records: TicketRecord[];
   periodLabel: string;
 }) {
+  const [targetContainment, setTargetContainment] = useState(70);
+  const [minutesSaved, setMinutesSaved] = useState(AVOIDED_MANUAL_MINUTES);
   const chatbot = calculateChatbotMetrics(records);
   const opportunities = rankAutomationOpportunities(records);
   const chatbotRecords = records.filter(
@@ -1798,6 +1801,23 @@ function AIAndAutomation({
     .sort((a, b) => b.fallbackRate - a.fallbackRate);
   const primaryFallback = fallbackIntents[0] ?? null;
   const trend = buildChatbotTrend(chatbotRecords);
+  const scenario = projectAutomationScenario(
+    chatbot,
+    targetContainment,
+    minutesSaved,
+  );
+  const resolvedBotRecords = chatbotRecords.filter(
+    (record) => record.chatbotOutcome === "Resolved",
+  );
+  const resolvedBotKpis = calculateKpis(resolvedBotRecords);
+  const resolvedBotRepeatRate = resolvedBotRecords.length
+    ? (resolvedBotRecords.filter((record) => record.reopened || record.repeatContact).length /
+      resolvedBotRecords.length) * 100
+    : null;
+  const resolvedBotEscalationRate = resolvedBotRecords.length
+    ? (resolvedBotRecords.filter((record) => record.escalated).length /
+      resolvedBotRecords.length) * 100
+    : null;
 
   if (!records.length) {
     return (
@@ -1953,6 +1973,62 @@ function AIAndAutomation({
             ))}
           </div>
         </article>
+      </section>
+
+      <section className="automation-scenario-panel">
+        <div className="scenario-heading">
+          <div>
+            <p className="eyebrow">Stage 3 · Automation impact scenario</p>
+            <h2>Estimate the gain—then check the customer outcome.</h2>
+            <p>Adjust the assumptions to model potential workload reduction. This is a planning estimate, not realized savings.</p>
+          </div>
+          <div className="scenario-current">
+            <span>Current containment</span>
+            <strong>{formatMetric(chatbot.containmentRate, "percent")}</strong>
+            <small>{chatbot.resolved} of {chatbot.conversations} eligible conversations</small>
+          </div>
+        </div>
+        <div className="scenario-layout">
+          <div className="scenario-controls">
+            <label>
+              <span><b>Target containment</b><strong>{scenario.targetContainmentRate.toFixed(0)}%</strong></span>
+              <input
+                type="range"
+                min={Math.ceil(chatbot.containmentRate ?? 0)}
+                max="100"
+                step="5"
+                value={Math.max(targetContainment, Math.ceil(chatbot.containmentRate ?? 0))}
+                onChange={(event) => setTargetContainment(Number(event.target.value))}
+                aria-label="Target chatbot containment rate"
+              />
+              <small>Raise only where intent quality and knowledge coverage support it.</small>
+            </label>
+            <label>
+              <span><b>Minutes avoided per containment</b><strong>{minutesSaved} min</strong></span>
+              <input
+                type="range"
+                min="5"
+                max="30"
+                step="1"
+                value={minutesSaved}
+                onChange={(event) => setMinutesSaved(Number(event.target.value))}
+                aria-label="Minutes of agent work avoided per contained conversation"
+              />
+              <small>Use the team’s average assisted handling effort when available.</small>
+            </label>
+          </div>
+          <div className="scenario-results" aria-live="polite">
+            <article><span>Projected contained</span><strong>{scenario.projectedContainedConversations}</strong><small>+{scenario.additionalContainedConversations} conversations</small></article>
+            <article><span>Projected hours saved</span><strong>{scenario.projectedHoursSaved.toFixed(1)}</strong><small>+{scenario.additionalHoursSaved.toFixed(1)} incremental hours</small></article>
+            <article><span>Remaining assisted</span><strong>{Math.max(0, chatbot.conversations - scenario.projectedContainedConversations)}</strong><small>Fallback or agent handoff capacity</small></article>
+          </div>
+        </div>
+        <div className="quality-guardrails">
+          <div><span>Contained CSAT</span><strong>{formatMetric(resolvedBotKpis.csatPercent, "percent")}</strong><small>Protect customer satisfaction</small></div>
+          <div><span>Repeat-contact signal</span><strong>{formatMetric(resolvedBotRepeatRate, "percent")}</strong><small>Lower is better after containment</small></div>
+          <div><span>Escalation signal</span><strong>{formatMetric(resolvedBotEscalationRate, "percent")}</strong><small>Watch for hidden failure demand</small></div>
+          <p><b>Decision rule:</b> increase containment only when satisfaction remains healthy and repeat contact or escalation does not worsen.</p>
+        </div>
       </section>
 
       <section className="automation-table-panel">
