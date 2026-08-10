@@ -817,7 +817,7 @@ select:focus-visible {
   line-height: 1;
 }
 
-.metric-info::after {
+.tooltip-bar.metric-info::after {
   width: 270px;
   max-width: min(270px, calc(100vw - 28px));
   text-align: left;
