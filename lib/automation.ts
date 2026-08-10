@@ -29,6 +29,14 @@ export type AutomationOpportunity = {
   recommendation: string;
 };
 
+export type AutomationScenario = {
+  targetContainmentRate: number;
+  projectedContainedConversations: number;
+  additionalContainedConversations: number;
+  projectedHoursSaved: number;
+  additionalHoursSaved: number;
+};
+
 const percent = (part: number, total: number) =>
   total ? (part / total) * 100 : null;
 
@@ -57,6 +65,38 @@ export function calculateChatbotMetrics(
     handoffRate: percent(handoff, conversations.length),
     ticketsAvoided: resolved,
     estimatedHoursSaved: (resolved * AVOIDED_MANUAL_MINUTES) / 60,
+  };
+}
+
+export function projectAutomationScenario(
+  metrics: ChatbotMetrics,
+  requestedContainmentRate: number,
+  minutesSavedPerContainment = AVOIDED_MANUAL_MINUTES,
+): AutomationScenario {
+  const currentRate = metrics.containmentRate ?? 0;
+  const targetContainmentRate = Math.max(
+    currentRate,
+    Math.min(100, requestedContainmentRate),
+  );
+  const safeMinutes = Math.max(0, minutesSavedPerContainment);
+  const projectedContainedConversations = Math.min(
+    metrics.conversations,
+    Math.round(metrics.conversations * (targetContainmentRate / 100)),
+  );
+  const additionalContainedConversations = Math.max(
+    0,
+    projectedContainedConversations - metrics.resolved,
+  );
+  const projectedHoursSaved =
+    (projectedContainedConversations * safeMinutes) / 60;
+
+  return {
+    targetContainmentRate,
+    projectedContainedConversations,
+    additionalContainedConversations,
+    projectedHoursSaved,
+    additionalHoursSaved:
+      (additionalContainedConversations * safeMinutes) / 60,
   };
 }
 
@@ -121,4 +161,3 @@ export function rankAutomationOpportunities(
     })
     .sort((a, b) => b.score - a.score);
 }
-
