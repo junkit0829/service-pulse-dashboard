@@ -26,6 +26,10 @@ export const importFields = [
   { key: "repeatContact", label: "Repeat contact", required: false },
   { key: "chatbotOutcome", label: "Chatbot outcome", required: false },
   { key: "requiredFieldsComplete", label: "Required fields complete", required: false },
+  { key: "crmProfileLinked", label: "CRM profile linked", required: false },
+  { key: "routingMode", label: "Routing mode", required: false },
+  { key: "knowledgeBaseUsed", label: "Knowledge base used", required: false },
+  { key: "workflowBypassed", label: "Workflow bypassed", required: false },
 ] as const;
 
 export type ImportFieldKey = (typeof importFields)[number]["key"];
@@ -161,6 +165,20 @@ export function validateAndNormalizeRows(
       ),
       categoryAccurate: true,
       workflowCompliant: true,
+      crmProfileLinked: booleanValue(
+        value(row, mapping, "crmProfileLinked"),
+        booleanValue(value(row, mapping, "requiredFieldsComplete"), true),
+      ),
+      routingMode:
+        String(value(row, mapping, "routingMode") ?? "").toLowerCase() === "automated" ||
+        channel === "Chatbot"
+          ? "Automated"
+          : "Manual",
+      knowledgeBaseUsed: booleanValue(
+        value(row, mapping, "knowledgeBaseUsed"),
+        channel === "Chatbot" || category === "Product Question",
+      ),
+      workflowBypassed: booleanValue(value(row, mapping, "workflowBypassed")),
       escalated: false,
       workflowStage,
       lastActivityAt: createdAt,
@@ -187,6 +205,10 @@ export function toExportRows(records: TicketRecord[]) {
     repeatContact: record.repeatContact,
     chatbotOutcome: record.chatbotOutcome ?? "",
     requiredFieldsComplete: record.requiredFieldsComplete,
+    crmProfileLinked: record.crmProfileLinked,
+    routingMode: record.routingMode,
+    knowledgeBaseUsed: record.knowledgeBaseUsed,
+    workflowBypassed: record.workflowBypassed,
   }));
 }
 
@@ -215,4 +237,3 @@ export function buildReportPeriods(
       kpis: calculateKpis(periodRecords),
     }));
 }
-

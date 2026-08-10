@@ -29,6 +29,10 @@ export type TicketRecord = {
   requiredFieldsComplete: boolean;
   categoryAccurate: boolean;
   workflowCompliant: boolean;
+  crmProfileLinked: boolean;
+  routingMode: "Automated" | "Manual";
+  knowledgeBaseUsed: boolean;
+  workflowBypassed: boolean;
   escalated: boolean;
   workflowStage: WorkflowStage;
   lastActivityAt: string;
@@ -85,6 +89,11 @@ const seeds: Seed[] = [
   requiredFieldsComplete: values[13] as boolean,
   categoryAccurate: index % 7 !== 0,
   workflowCompliant: index % 6 !== 0,
+  crmProfileLinked: index % 5 !== 0,
+  routingMode: values[3] === "Chatbot" || index % 4 !== 0 ? "Automated" : "Manual",
+  knowledgeBaseUsed:
+    values[3] === "Chatbot" || values[4] === "Product Question" || index % 3 === 0,
+  workflowBypassed: index % 8 === 0,
   escalated: Boolean(values[10] || values[11] || index % 9 === 0),
   workflowStage:
     values[5] === "Resolved"
