@@ -116,6 +116,11 @@ test("synthetic records cover every job-description data domain", () => {
   assert.ok(tickets.some((record) => record.chatbotOutcome === "Resolved"));
   assert.ok(tickets.some((record) => record.chatbotOutcome === "Fallback"));
   assert.ok(tickets.some((record) => record.chatbotOutcome === "Handoff"));
+  assert.ok(tickets.some((record) => record.crmProfileLinked));
+  assert.ok(tickets.some((record) => record.routingMode === "Automated"));
+  assert.ok(tickets.some((record) => record.routingMode === "Manual"));
+  assert.ok(tickets.some((record) => record.knowledgeBaseUsed));
+  assert.ok(tickets.some((record) => record.workflowBypassed));
 });
 
 test("priority actions rank traceable cross-functional recommendations", () => {
@@ -250,6 +255,25 @@ test("process recommendations distinguish training, workflow, and system fixes",
     [...new Set(actions.map((action) => action.type))].sort(),
     ["System", "Training", "Workflow"],
   );
+});
+
+test("system adoption metrics reconcile with ticket-level usage fields", () => {
+  const health = analyzeProcessHealth(tickets, "2026-07-27", 2);
+  const expectedCrm =
+    (tickets.filter((record) => record.crmProfileLinked).length / tickets.length) * 100;
+  const expectedRouting =
+    (tickets.filter((record) => record.routingMode === "Automated").length /
+      tickets.length) *
+    100;
+  const expectedBypass =
+    (tickets.filter((record) => record.workflowBypassed).length / tickets.length) *
+    100;
+
+  assert.equal(health.crmProfileLinkRate, expectedCrm);
+  assert.equal(health.automatedRoutingRate, expectedRouting);
+  assert.equal(health.workflowBypassRate, expectedBypass);
+  assert.ok((health.overallSystemAdoptionScore ?? -1) >= 0);
+  assert.ok((health.overallSystemAdoptionScore ?? 101) <= 100);
 });
 
 test("the Excel-compatible template validates and reproduces KPI inputs", () => {
