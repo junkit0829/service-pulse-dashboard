@@ -2153,6 +2153,43 @@ function ProcessHealthPage({
       lowerIsBetter: true,
     },
   ];
+  const systemUsageMetrics = [
+    {
+      label: "CRM profile linkage",
+      value: health.crmProfileLinkRate,
+      target: 90,
+      detail: "Customer context linked to the ticket",
+      direction: "higher" as const,
+    },
+    {
+      label: "Automated routing",
+      value: health.automatedRoutingRate,
+      target: 80,
+      detail: "Tickets assigned without manual triage",
+      direction: "higher" as const,
+    },
+    {
+      label: "Knowledge support",
+      value: health.knowledgeBaseUsageRate,
+      target: 60,
+      detail: "Resolution supported by knowledge content",
+      direction: "higher" as const,
+    },
+    {
+      label: "Workflow bypass",
+      value: health.workflowBypassRate,
+      target: 10,
+      detail: "Tickets skipping the expected workflow",
+      direction: "lower" as const,
+    },
+    {
+      label: "Chatbot usage",
+      value: health.chatbotUsageRate,
+      target: null,
+      detail: "Share of tickets entering via chatbot",
+      direction: "context" as const,
+    },
+  ];
 
   return (
     <>
@@ -2198,6 +2235,53 @@ function ProcessHealthPage({
             </article>
           );
         })}
+      </section>
+
+      <section className="system-adoption-panel">
+        <div className="system-adoption-heading">
+          <div>
+            <p className="eyebrow">Stage 2 · System usage & adoption</p>
+            <h2>Are teams using the service tools as designed?</h2>
+            <p>Track customer context, routing automation, knowledge usage, and workflow discipline across the selected records.</p>
+          </div>
+          <div className={`adoption-score ${(health.overallSystemAdoptionScore ?? 0) >= 80 ? "healthy" : "gap"}`}>
+            <span>Weighted adoption score</span>
+            <strong>{formatMetric(health.overallSystemAdoptionScore, "percent")}</strong>
+            <small>CRM 30% · routing 25% · knowledge 20% · intake 15% · bypass 10%</small>
+          </div>
+        </div>
+        <div className="system-usage-grid">
+          {systemUsageMetrics.map((metric) => {
+            const healthy =
+              metric.target === null
+                ? null
+                : metric.value !== null &&
+                  (metric.direction === "higher"
+                    ? metric.value >= metric.target
+                    : metric.value <= metric.target);
+            const width = Math.min(100, Math.max(0, metric.value ?? 0));
+            return (
+              <article className={healthy === null ? "context" : healthy ? "healthy" : "gap"} key={metric.label}>
+                <div>
+                  <span>{metric.label}</span>
+                  <b>{healthy === null ? "Context" : healthy ? "On target" : "Adoption gap"}</b>
+                </div>
+                <strong>{formatMetric(metric.value, "percent")}</strong>
+                <p>{metric.detail}</p>
+                <i aria-hidden="true"><b style={{ width: `${width}%` }} /></i>
+                <small>
+                  {metric.target === null
+                    ? "Monitor alongside containment and handoff"
+                    : `${metric.direction === "higher" ? "Target ≥" : "Limit ≤"} ${metric.target}%`}
+                </small>
+              </article>
+            );
+          })}
+        </div>
+        <div className="adoption-data-note">
+          <span>Data note</span>
+          <p>These measures use the optional CRM profile, routing mode, knowledge usage, and workflow bypass fields in the Excel template. Imported files without those fields use conservative defaults.</p>
+        </div>
       </section>
 
       <section className="process-main-grid">
@@ -2255,8 +2339,8 @@ function ProcessHealthPage({
       <section className="team-adoption-panel">
         <div className="section-title compact">
           <div>
-            <p className="eyebrow">Team and system adoption</p>
-            <h2>Where process gaps originate</h2>
+            <p className="eyebrow">Cross-team system adoption</p>
+            <h2>Where tool-usage gaps originate</h2>
           </div>
           <small>Click a team to focus the page</small>
         </div>
@@ -2269,8 +2353,11 @@ function ProcessHealthPage({
                 <th>Required fields</th>
                 <th>Category accuracy</th>
                 <th>Workflow</th>
-                <th>SLA</th>
-                <th>Escalated</th>
+                <th>CRM linked</th>
+                <th>Auto routing</th>
+                <th>Knowledge</th>
+                <th>Bypass</th>
+                <th>Adoption score</th>
                 <th>Stuck</th>
               </tr>
             </thead>
@@ -2282,8 +2369,11 @@ function ProcessHealthPage({
                   <td>{formatMetric(item.health.requiredFieldCompletionRate, "percent")}</td>
                   <td>{formatMetric(item.health.categorizationAccuracyRate, "percent")}</td>
                   <td>{formatMetric(item.health.workflowComplianceRate, "percent")}</td>
-                  <td>{formatMetric(item.health.slaComplianceRate, "percent")}</td>
-                  <td>{formatMetric(item.health.escalationRate, "percent")}</td>
+                  <td>{formatMetric(item.health.crmProfileLinkRate, "percent")}</td>
+                  <td>{formatMetric(item.health.automatedRoutingRate, "percent")}</td>
+                  <td>{formatMetric(item.health.knowledgeBaseUsageRate, "percent")}</td>
+                  <td>{formatMetric(item.health.workflowBypassRate, "percent")}</td>
+                  <td><span className={(item.health.overallSystemAdoptionScore ?? 0) >= 80 ? "table-good" : "table-risk"}>{formatMetric(item.health.overallSystemAdoptionScore, "percent")}</span></td>
                   <td><span className={item.health.stuckTickets.length ? "table-risk" : "table-good"}>{item.health.stuckTickets.length}</span></td>
                 </tr>
               ))}
@@ -2328,7 +2418,7 @@ function ProcessHealthPage({
         </div>
         <div className="process-action-grid">
           {recommendations.map((action) => (
-            <article className={action.type.toLowerCase()} key={action.type}>
+            <article className={action.type.toLowerCase()} key={action.title}>
               <span>{action.type}</span>
               <strong>{action.title}</strong>
               <p>{action.evidence}</p>
