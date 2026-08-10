@@ -40,8 +40,11 @@ import {
 } from "../lib/priority-actions";
 import {
   autoMapColumns,
+  buildPivotSummary,
   buildReportPeriods,
   importFields,
+  metricDefinitions,
+  reportDataDictionary,
   toExportRows,
   validateAndNormalizeRows,
   type ColumnMapping,
@@ -1978,7 +1981,7 @@ function AIAndAutomation({
       <section className="automation-scenario-panel">
         <div className="scenario-heading">
           <div>
-            <p className="eyebrow">Stage 3 · Automation impact scenario</p>
+            <p className="eyebrow">Automation impact scenario</p>
             <h2>Estimate the gain—then check the customer outcome.</h2>
             <p>Adjust the assumptions to model potential workload reduction. This is a planning estimate, not realized savings.</p>
           </div>
@@ -2316,7 +2319,7 @@ function ProcessHealthPage({
       <section className="system-adoption-panel">
         <div className="system-adoption-heading">
           <div>
-            <p className="eyebrow">Stage 2 · System usage & adoption</p>
+            <p className="eyebrow">System usage & adoption</p>
             <h2>Are teams using the service tools as designed?</h2>
             <p>Track customer context, routing automation, knowledge usage, and workflow discipline across the selected records.</p>
           </div>
@@ -2603,45 +2606,119 @@ function ReportsAndExcel({
   const downloadReport = async () => {
     const XLSX = await import("xlsx");
     const workbook = XLSX.utils.book_new();
-    const summaryRows = [
-      { metric: "Active filter", value: filterSummary },
-      { metric: "Ticket volume", value: reportKpis.ticketCount },
-      { metric: "CSAT", value: formatMetric(reportKpis.csatPercent, "percent") },
-      { metric: "First response", value: formatMetric(reportKpis.averageFirstResponseMinutes, "minutes") },
-      { metric: "Handling time", value: formatMetric(reportKpis.averageHandlingMinutes, "minutes") },
-      { metric: "Resolution rate", value: formatMetric(reportKpis.resolutionRate, "percent") },
-      { metric: "SLA compliance", value: formatMetric(reportKpis.slaComplianceRate, "percent") },
-      { metric: "Backlog", value: reportKpis.backlog },
+    type Sheet = ReturnType<typeof XLSX.utils.aoa_to_sheet> & {
+      "!cols"?: { wch: number }[];
+      "!autofilter"?: { ref: string };
+    };
+    const percent = (value: number | null) => value === null ? null : value / 100;
+    const setFormats = (sheet: Sheet, columns: Record<number, string>, startRow: number, endRow: number) => {
+      Object.entries(columns).forEach(([column, format]) => {
+        for (let row = startRow; row <= endRow; row += 1) {
+          const address = XLSX.utils.encode_cell({ r: row - 1, c: Number(column) });
+          if (sheet[address]) sheet[address].z = format;
+        }
+      });
+    };
+    const appendSheet = (
+      name: string,
+      title: string,
+      subtitle: string,
+      headers: string[],
+      rows: (string | number | boolean | null)[][],
+      widths: number[],
+      formats: Record<number, string> = {},
+    ) => {
+      const sheet = XLSX.utils.aoa_to_sheet([
+        [title],
+        [subtitle],
+        [],
+        headers,
+        ...rows,
+      ]) as Sheet;
+      sheet["!cols"] = widths.map((wch) => ({ wch }));
+      if (rows.length) sheet["!autofilter"] = { ref: `A4:${XLSX.utils.encode_col(headers.length - 1)}${rows.length + 4}` };
+      setFormats(sheet, formats, 5, rows.length + 4);
+      XLSX.utils.book_append_sheet(workbook, sheet, name);
+    };
+
+    const summaryRows: (string | number | null)[][] = [
+      ["Ticket volume", reportKpis.ticketCount, null, "Context", "Count of tickets in the selected reporting context."],
+      ["CSAT", percent(reportKpis.csatPercent), .85, (reportKpis.csatPercent ?? 0) >= 85 ? "On target" : "Below target", "Share of valid responses scoring 4 or 5."],
+      ["First response", reportKpis.averageFirstResponseMinutes, 15, (reportKpis.averageFirstResponseMinutes ?? Infinity) <= 15 ? "On target" : "Above target", "Average minutes to first response."],
+      ["Handling time", reportKpis.averageHandlingMinutes, 30, (reportKpis.averageHandlingMinutes ?? Infinity) <= 30 ? "On target" : "Above target", "Average active handling minutes."],
+      ["Resolution rate", percent(reportKpis.resolutionRate), .9, (reportKpis.resolutionRate ?? 0) >= 90 ? "On target" : "Below target", "Resolved tickets divided by all tickets."],
+      ["First-contact resolution", percent(reportKpis.firstContactResolutionRate), .8, (reportKpis.firstContactResolutionRate ?? 0) >= 80 ? "On target" : "Below target", "Resolved without reopen or repeat contact."],
+      ["SLA compliance", percent(reportKpis.slaComplianceRate), .9, (reportKpis.slaComplianceRate ?? 0) >= 90 ? "On target" : "Below target", "Eligible first responses completed within SLA."],
+      ["Backlog", reportKpis.backlog, null, "Monitor", "Tickets not yet resolved."],
     ];
-    const periodRows = reportPeriods.map((period) => ({
-      period: period.period,
-      tickets: period.kpis.ticketCount,
-      csat: period.kpis.csatPercent,
-      firstResponseMinutes: period.kpis.averageFirstResponseMinutes,
-      handlingMinutes: period.kpis.averageHandlingMinutes,
-      resolutionRate: period.kpis.resolutionRate,
-      slaComplianceRate: period.kpis.slaComplianceRate,
-      backlog: period.kpis.backlog,
-    }));
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(summaryRows),
-      "Management Summary",
+    appendSheet(
+      "KPI Summary",
+      "Service Pulse · Management KPI Summary",
+      `Reporting context: ${filterSummary} | Source: ${sourceName}`,
+      ["Metric", "Current value", "Target / benchmark", "Status", "Definition"],
+      summaryRows,
+      [27, 18, 20, 16, 58],
+      { 1: "0.0", 2: "0.0" },
     );
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(periodRows),
-      cadence === "weekly" ? "Weekly Review" : "Monthly Review",
+    setFormats(workbook.Sheets["KPI Summary"] as Sheet, { 1: "0.0%", 2: "0.0%" }, 6, 6);
+    setFormats(workbook.Sheets["KPI Summary"] as Sheet, { 1: "0.0%", 2: "0.0%" }, 9, 11);
+
+    const periodRows = (periods: ReturnType<typeof buildReportPeriods>) => periods.map((period) => [
+      period.period,
+      period.kpis.ticketCount,
+      percent(period.kpis.csatPercent),
+      period.kpis.averageFirstResponseMinutes,
+      period.kpis.averageHandlingMinutes,
+      percent(period.kpis.resolutionRate),
+      percent(period.kpis.firstContactResolutionRate),
+      percent(period.kpis.slaComplianceRate),
+      period.kpis.backlog,
+    ]);
+    const periodHeaders = ["Period", "Tickets", "CSAT", "First response (min)", "Handling (min)", "Resolution rate", "First-contact resolution", "SLA compliance", "Backlog"];
+    const periodWidths = [18, 12, 13, 21, 17, 18, 25, 18, 12];
+    const periodFormats = { 1: "#,##0", 2: "0.0%", 3: "0.0", 4: "0.0", 5: "0.0%", 6: "0.0%", 7: "0.0%", 8: "#,##0" };
+    appendSheet("Weekly Review", "Service Pulse · Weekly Business Review", filterSummary, periodHeaders, periodRows(buildReportPeriods(records, "weekly")), periodWidths, periodFormats);
+    appendSheet("Monthly Review", "Service Pulse · Monthly Business Review", filterSummary, periodHeaders, periodRows(buildReportPeriods(records, "monthly")), periodWidths, periodFormats);
+
+    const pivotRows = buildPivotSummary(records).map((row) => [
+      row.dimension, row.value, row.tickets, percent(row.csatPercent), row.firstResponseMinutes,
+      row.handlingMinutes, percent(row.resolutionRate), percent(row.firstContactResolutionRate),
+      percent(row.slaComplianceRate), row.backlog,
+    ]);
+    appendSheet(
+      "Pivot Summary",
+      "Service Pulse · Pivot-style Performance Summary",
+      "Use Excel filters to compare teams, channels, and issue categories.",
+      ["Dimension", "Value", "Tickets", "CSAT", "First response (min)", "Handling (min)", "Resolution rate", "First-contact resolution", "SLA compliance", "Backlog"],
+      pivotRows,
+      [19, 24, 12, 13, 21, 17, 18, 25, 18, 12],
+      { 2: "#,##0", 3: "0.0%", 4: "0.0", 5: "0.0", 6: "0.0%", 7: "0.0%", 8: "0.0%", 9: "#,##0" },
     );
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(toExportRows(records)),
-      "Filtered Records",
+
+    appendSheet(
+      "Metric Definitions",
+      "Service Pulse · Metric Definitions",
+      "Definitions make calculations consistent across weekly and monthly reviews.",
+      ["Metric", "Definition", "Calculation", "Preferred direction"],
+      metricDefinitions.map((row) => [row.metric, row.definition, row.calculation, row.preferredDirection]),
+      [28, 62, 54, 22],
     );
-    XLSX.writeFile(
-      workbook,
-      `service-pulse-${cadence}-report.xlsx`,
+    appendSheet(
+      "Data Dictionary",
+      "Service Pulse · Data Dictionary",
+      "Field-level guide for preparing imports and interpreting raw records.",
+      ["Field", "Display label", "Import requirement", "Description"],
+      reportDataDictionary.map((row) => [row.field, row.label, row.requiredForImport, row.description]),
+      [28, 31, 21, 70],
     );
+
+    const rawRows = toExportRows(records);
+    const rawSheet = XLSX.utils.json_to_sheet(rawRows) as Sheet;
+    rawSheet["!cols"] = Object.keys(rawRows[0] ?? {}).map((key) => ({ wch: Math.min(28, Math.max(12, key.length + 2)) }));
+    if (rawRows.length) rawSheet["!autofilter"] = { ref: rawSheet["!ref"] ?? "A1:A1" };
+    XLSX.utils.book_append_sheet(workbook, rawSheet, "Raw Records");
+
+    XLSX.writeFile(workbook, "service-pulse-management-report.xlsx", { compression: true });
   };
 
   return (
@@ -2780,8 +2857,12 @@ function ReportsAndExcel({
               <button className={cadence === "weekly" ? "active" : ""} onClick={() => setCadence("weekly")}>Weekly</button>
               <button className={cadence === "monthly" ? "active" : ""} onClick={() => setCadence("monthly")}>Monthly</button>
             </div>
-            <button className="export-report-button" onClick={() => void downloadReport()}>Export filtered report</button>
+            <button className="export-report-button" onClick={() => void downloadReport()}>Export full Excel report</button>
           </div>
+        </div>
+        <div className="workbook-contents" aria-label="Exported workbook contents">
+          <strong>Workbook includes</strong>
+          <span>KPI summary</span><span>Pivot summary</span><span>Weekly review</span><span>Monthly review</span><span>Metric definitions</span><span>Data dictionary</span><span>Raw records</span>
         </div>
         <div className="review-kpi-strip">
           <div><span>Tickets</span><strong>{reportKpis.ticketCount}</strong></div>

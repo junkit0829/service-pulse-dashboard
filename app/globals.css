@@ -3633,6 +3633,34 @@ select:focus-visible {
   margin-bottom: 16px;
 }
 
+.workbook-contents {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 11px 13px;
+  overflow-x: auto;
+  border: 1px solid #dce8e5;
+  border-radius: 11px;
+  background: #f7faf9;
+  white-space: nowrap;
+}
+
+.workbook-contents strong {
+  margin-right: 4px;
+  color: #365159;
+  font-size: 11px;
+}
+
+.workbook-contents span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #49706a;
+  background: #e5f2ef;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .business-review-table {
   width: 100%;
   border-collapse: collapse;
