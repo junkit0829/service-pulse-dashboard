@@ -519,8 +519,16 @@ function PriorityActionsPage({
 
                   <p className="priority-evidence">{action.evidence}</p>
 
+                  <div className="recommendation-basis" aria-label={`Why ${action.title} was recommended`}>
+                    <span className="recommendation-type">{action.recommendationType} recommendation</span>
+                    <span className="basis-label">Triggered by</span>
+                    {action.recommendationBasis.map((reason) => (
+                      <span className="basis-chip" key={reason}>{reason}</span>
+                    ))}
+                  </div>
+
                   <div className="priority-action-detail-grid">
-                    <div><span>Recommended action</span><strong>{action.recommendation}</strong></div>
+                    <div><span>Recommended action · rule-based</span><strong>{action.recommendation}</strong></div>
                     <div><span>Accountable owner</span><strong>{action.owner}</strong></div>
                     <div><span>Expected reach</span><strong>{action.expectedImpact}</strong></div>
                     <div><span>Success measure</span><strong>{action.targetOutcome}</strong></div>

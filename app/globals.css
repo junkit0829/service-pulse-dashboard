@@ -3826,6 +3826,46 @@ select:focus-visible {
   line-height: 1.6;
 }
 
+.recommendation-basis {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -2px 0 14px;
+}
+
+.recommendation-type,
+.basis-label,
+.basis-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 750;
+}
+
+.recommendation-type {
+  padding: 0 9px;
+  color: #176f66;
+  background: #dff2ee;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.basis-label {
+  padding-left: 4px;
+  color: #8a9699;
+  text-transform: uppercase;
+}
+
+.basis-chip {
+  padding: 0 8px;
+  border: 1px solid #dce6e4;
+  color: #536b6d;
+  background: #fff;
+}
+
 .priority-action-detail-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(130px, 1fr));
